@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use crate::build_tool::{build_tool, create_project};
 use crate::cache::Cache;
-use crate::{DEBUG, Lang, MAX_NUMBER_OF_ATTEMPTS};
+use crate::llm_api::LLMApi;
 use crate::llm_parser::{extract, extract_number};
 use crate::llm_prompt::Prompt;
-use crate::llm_api::LLMApi;
-
+use crate::{Lang, DEBUG, MAX_NUMBER_OF_ATTEMPTS};
+use std::collections::HashMap;
 
 pub fn run_state_machine(
     lang: &Lang,
@@ -16,7 +15,7 @@ pub fn run_state_machine(
     tests: &mut String,
     output: &mut String,
     prompt: &Prompt,
-    cache:  &mut Cache,
+    cache: &mut Cache,
     llm: &LLMApi,
 ) {
     let states: HashMap<String, State> = extract_states(states_str_var);
@@ -45,18 +44,35 @@ pub fn run_state_machine(
         match state_type.as_str() {
             "llm_request" => {
                 let array_src = extract_param_array(state_params[1]);
-                let array:Vec<String> = replace_in_array(array_src,  question, code, dependencies, tests, output, current_state_params);
+                let array: Vec<String> = replace_in_array(
+                    array_src,
+                    question,
+                    code,
+                    dependencies,
+                    tests,
+                    output,
+                    current_state_params,
+                );
                 // println!("{:#?}", array);
-                let result = llm.request(state_params[0].replace("\"", "").as_str(), &array, cache, prompt);
+                let result = llm.request(
+                    state_params[0].replace("\"", "").as_str(),
+                    &array,
+                    cache,
+                    prompt,
+                );
 
                 let next_state_name = current_state.transitions.keys().next().unwrap().to_string();
-                let param = current_state.transitions.get(&next_state_name).unwrap().to_string();
+                let param = current_state
+                    .transitions
+                    .get(&next_state_name)
+                    .unwrap()
+                    .to_string();
                 let mut next_state_params = HashMap::new();
                 next_state_params.insert(param, result);
 
                 current_state_name = next_state_name;
                 current_state_params = next_state_params;
-                println!("===============");
+                println!("=========g======");
 
                 continue;
             }
@@ -67,12 +83,19 @@ pub fn run_state_machine(
                     "extract_test" => "tests",
                     &_ => panic!("Unknown extract type: {}", state_type),
                 };
-                let result = extract(lang, current_state_params.get(state_params[0]).unwrap(), extract_type);
+                let result = extract(
+                    lang,
+                    current_state_params.get(state_params[0]).unwrap(),
+                    extract_type,
+                );
                 let next_state_name = current_state.transitions.keys().next().unwrap().to_string();
-                let param = current_state.transitions.get(&next_state_name).unwrap().to_string();
+                let param = current_state
+                    .transitions
+                    .get(&next_state_name)
+                    .unwrap()
+                    .to_string();
                 let mut next_state_params = HashMap::new();
                 next_state_params.insert(param.clone(), result.clone());
-
 
                 current_state_name = next_state_name;
                 current_state_params = next_state_params;
@@ -91,7 +114,14 @@ pub fn run_state_machine(
                 }
                 if current_state_params.contains_key("dependencies") {
                     let dependencies_param = current_state_params.get("dependencies").unwrap();
-                    update_global_vars("dependencies", dependencies_param, code, dependencies, tests, output);
+                    update_global_vars(
+                        "dependencies",
+                        dependencies_param,
+                        code,
+                        dependencies,
+                        tests,
+                        output,
+                    );
                 } else {
                     if !state_params.contains(&"dependencies") {
                         update_global_vars("dependencies", "", code, dependencies, tests, output);
@@ -114,12 +144,20 @@ pub fn run_state_machine(
                 continue;
             }
             "build_tool" => {
-                let result:(bool, String) = build_tool(lang, &state_params[0].replace("\"",""), cache);
+                let result: (bool, String) =
+                    build_tool(lang, &state_params[0].replace("\"", ""), cache);
                 let param_first_name = result.0.to_string();
                 let param_first_name_value = result.0.to_string();
                 let param_second_name = "output".to_string();
                 let param_second_value = result.1.to_string();
-                update_global_vars("output", &param_second_value, code, dependencies, tests, output);
+                update_global_vars(
+                    "output",
+                    &param_second_value,
+                    code,
+                    dependencies,
+                    tests,
+                    output,
+                );
                 let transition_condition = format!("({},{})", param_first_name, param_second_name);
                 // println!("{}", transition_condition);
                 let mut next_state_name = "".to_string();
@@ -138,7 +176,8 @@ pub fn run_state_machine(
                 continue;
             }
             "extract_number" => {
-                let result = extract_number(current_state_params.get(state_params[0]).unwrap()).to_string();
+                let result =
+                    extract_number(current_state_params.get(state_params[0]).unwrap()).to_string();
                 let mut next_state_name: String = "".to_string();
                 for (key, value) in current_state.transitions.iter() {
                     next_state_name = if value == &result {
@@ -162,7 +201,6 @@ pub fn run_state_machine(
                 return;
             }
             &_ => {
-
                 current_state_params = HashMap::new();
                 current_state_name = "finish".to_string();
                 println!("===============");
@@ -172,7 +210,15 @@ pub fn run_state_machine(
     }
 }
 
-fn replace_in_array(array: Vec<&str>, question: &str, code: &str, dependencies: &str, tests: &str, output: &str ,params: HashMap<String, String>) -> Vec<String> {
+fn replace_in_array(
+    array: Vec<&str>,
+    question: &str,
+    code: &str,
+    dependencies: &str,
+    tests: &str,
+    output: &str,
+    params: HashMap<String, String>,
+) -> Vec<String> {
     let mut new_array = Vec::new();
     for item in array {
         match item {
@@ -190,7 +236,14 @@ fn replace_in_array(array: Vec<&str>, question: &str, code: &str, dependencies: 
     }
     new_array
 }
-fn update_global_vars(param_name: &str, param_value: &str, code: &mut String, dependencies: &mut String, tests: &mut String, output: &mut String)  {
+fn update_global_vars(
+    param_name: &str,
+    param_value: &str,
+    code: &mut String,
+    dependencies: &mut String,
+    tests: &mut String,
+    output: &mut String,
+) {
     match param_name {
         "code" => *code = param_value.to_string(),
         "dependencies" => *dependencies = param_value.to_string(),
@@ -199,7 +252,6 @@ fn update_global_vars(param_name: &str, param_value: &str, code: &mut String, de
         &_ => {}
     }
 }
-
 
 fn extract_first_state(states_str_var: &str) -> String {
     let mut states = extract_states_impl(states_str_var);
@@ -280,24 +332,24 @@ fn extract_state_params(state_str: &str) -> Vec<&str> {
                 match c {
                     '"' => {
                         in_quotes = !in_quotes;
-                    },
+                    }
                     '[' => {
                         if !in_quotes {
                             bracket_depth += 1;
                         }
-                    },
+                    }
                     ']' => {
                         if !in_quotes && bracket_depth > 0 {
                             bracket_depth -= 1;
                         }
-                    },
+                    }
                     ',' => {
                         if !in_quotes && bracket_depth == 0 {
                             // Split here
                             params.push(params_str[current..i].trim());
                             current = i + 1;
                         }
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -344,25 +396,38 @@ finish --> [*]
 
     #[test]
     fn test_extract_state_params() {
-        let state_str = r#"llm_request("build_dependencies_req_prompt_template",abc,[question,code,output])"#;
-        assert_eq!(super::extract_state_params(state_str), vec!["\"build_dependencies_req_prompt_template\"","abc","[question,code,output]"]);
+        let state_str =
+            r#"llm_request("build_dependencies_req_prompt_template",abc,[question,code,output])"#;
+        assert_eq!(
+            super::extract_state_params(state_str),
+            vec![
+                "\"build_dependencies_req_prompt_template\"",
+                "abc",
+                "[question,code,output]"
+            ]
+        );
     }
 
     #[test]
     fn test_extract_param_array() {
         let param_str = "[question,code,output]";
-        assert_eq!(super::extract_param_array(param_str), vec!["question","code","output"]);
+        assert_eq!(
+            super::extract_param_array(param_str),
+            vec!["question", "code", "output"]
+        );
     }
 
     #[test]
     fn test_extract_states() {
-        println!("{:#?}",  crate::state_machine::extract_states(_STATES));
+        println!("{:#?}", crate::state_machine::extract_states(_STATES));
     }
 
     #[test]
     fn test_extract_first_state() {
         let first_state = super::extract_first_state(_STATES);
-        assert_eq!(first_state, "llm_request(\"generate_code_prompt_template\",[question])");
+        assert_eq!(
+            first_state,
+            "llm_request(\"generate_code_prompt_template\",[question])"
+        );
     }
-
 }

@@ -1,30 +1,46 @@
-use std::fmt::Display;
 use clap::{Arg, Command};
+use std::fmt::Display;
 use std::str::FromStr;
 
+mod build_tool;
 mod cache;
 mod llm_prompt;
-mod build_tool;
 
 mod llm_api;
-mod llm_parser;
 mod state_machine;
 
+mod java;
+mod javascript;
+mod kotlin;
+mod php;
+mod python;
+mod rust;
+mod scala;
+mod swift;
 
 const DEBUG: bool = false;
-const MAX_NUMBER_OF_ATTEMPTS:i32 = 30;
+const MAX_NUMBER_OF_ATTEMPTS: i32 = 5;
 fn main() {
     let matches = Command::new("rustsn - Rust Snippets Generator")
-        .version("0.6.0")
+        .version("0.7.0")
         .author("Evgeny Igumnov <igumnovnsk@gmail.com>")
-        .about("Generation, compilation, and testing of code using LLMs")
+        .about("Code snippets generator via LLMs and compiler/tester via build tools")
         .arg(
             Arg::new("lang")
                 .long("lang")
                 .value_name("LANG")
                 .help("Sets the programming language")
-                .default_value("RUST")
-                .value_names(&["RUST", "JAVA", "SCALA", "PYTHON", "C", "CPP", "KOTLIN", "SWIFT"]),
+                .default_value("javascript")
+                .value_parser(*&[
+                    "rust",
+                    "java",
+                    "javascript",
+                    "scala",
+                    "kotlin",
+                    "swift",
+                    "php",
+                    "python",
+                ]),
         )
         .get_matches();
 
@@ -40,28 +56,38 @@ fn main() {
     // Optionally, handle the selected language
     match lang {
         Lang::Rust => println!("Selected language: Rust"),
-        _ => {println!("Unsupported language: {:?}", lang); std::process::exit(1);}
+        Lang::Java => println!("Selected language: Java"),
+        Lang::Scala => println!("Selected language: Scala"),
+        Lang::JavaScript => println!("Selected language: JavaScript"),
+        Lang::Php => println!("Selected language: PHP"),
+        Lang::Python => println!("Selected language: Python"),
+        Lang::Kotlin => println!("Selected language: Kotlin"),
+        Lang::Swift => println!("Selected language: Swift"),
+        _ => {
+            println!("Unimplemented language: {:?}", lang);
+            std::process::exit(1);
+        }
     }
 
-    let states_str = std::fs::read_to_string(format!("{}/logic.md", lang)).unwrap();
     let mut cache = cache::Cache::new();
-    let prompt = llm_prompt::Prompt::new(format!("{}/prompt.txt", lang).as_str());
+    let prompt = llm_prompt::Prompt::new(format!("prompt/{}.txt", lang).as_str());
     // if file token.txt exists
-    let llm= if std::path::Path::new("token.txt").exists() {
+    let llm = if std::path::Path::new("token.txt").exists() {
         println!("Use OpenAI API");
         println!("");
         let token = std::fs::read_to_string("token.txt").unwrap();
         llm_api::LLMApi::new(llm_api::ModelType::OpenAI {
-            api_key: token.trim().to_string()
+            api_key: token.trim().to_string(),
         })
-    }
-    else {
+    } else {
         println!("Use Ollama API");
         println!("");
         llm_api::LLMApi::new(llm_api::ModelType::Ollama)
     };
 
-    println!("Use '\\' char in the end of line for multiline mode or just copy-paste multiline text.");
+    println!(
+        "Use '\\' char in the end of line for multiline mode or just copy-paste multiline text."
+    );
     println!("");
     println!("For launch code generation, type ENTER twice after the last line of the prompt.");
     println!("");
@@ -85,9 +111,12 @@ fn main() {
             lines.push(line.clone());
         }
 
-        let now_sec = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+        let now_sec = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
 
-        if start_sec == 0  {
+        if start_sec == 0 {
             start_sec = now_sec;
         } else {
             if now_sec - start_sec < 100 {
@@ -96,7 +125,7 @@ fn main() {
                 if line.ends_with("\\\r\n") {
                     continue;
                 }
-                break
+                break;
             }
         }
     }
@@ -105,44 +134,37 @@ fn main() {
     question.push('\r');
     question.push('\n');
 
-
-    let mut code = "".to_string();
-    let mut dependencies = "".to_string();
-    let mut tests = "".to_string();
-    let mut output = "".to_string();
-
     println!("====================");
-    state_machine::run_state_machine(&lang, &states_str, &question, &mut code, &mut dependencies, &mut tests, &mut output, &prompt, &mut cache, &llm);
+    state_machine::run_state_machine(&lang, &question, &prompt, &mut cache, &llm);
     println!("++++++++ Finished ++++++++++++");
-    println!("\n{}\n{}\n{}", code, dependencies, tests);
-    println!("++++++++ Finished ++++++++++++");
-
-
 }
-
 
 #[derive(Debug, Clone)]
 enum Lang {
     Rust,
     Java,
+    JavaScript,
     Scala,
     Python,
     C,
     Cpp,
     Kotlin,
+    Php,
     Swift,
 }
 
-impl  Display for Lang {
+impl Display for Lang {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Lang::Rust => write!(f, "rust"),
             Lang::Java => write!(f, "java"),
+            Lang::JavaScript => write!(f, "javascript"),
             Lang::Scala => write!(f, "scala"),
             Lang::Python => write!(f, "python"),
             Lang::C => write!(f, "c"),
             Lang::Cpp => write!(f, "cpp"),
             Lang::Kotlin => write!(f, "kotlin"),
+            Lang::Php => write!(f, "php"),
             Lang::Swift => write!(f, "swift"),
         }
     }
@@ -155,18 +177,15 @@ impl FromStr for Lang {
         match s.to_lowercase().as_str() {
             "rust" => Ok(Lang::Rust),
             "java" => Ok(Lang::Java),
+            "javascript" => Ok(Lang::JavaScript),
             "scala" => Ok(Lang::Scala),
             "python" => Ok(Lang::Python),
             "c" => Ok(Lang::C),
             "cpp" => Ok(Lang::Cpp),
             "kotlin" => Ok(Lang::Kotlin),
+            "php" => Ok(Lang::Php),
             "swift" => Ok(Lang::Swift),
             _ => Err(format!("Unsupported language: {}", s)),
         }
     }
 }
-
-
-
-
-

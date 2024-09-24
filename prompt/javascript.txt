@@ -1,0 +1,119 @@
+[[[generate]]]
+
+{{{0}}}
+
+Write JavaScript code that implements this function and name it `solution`. Also, write tests for this function.
+
+Finally, create 3 files:
+
+1. `src/solution.js` (contains the implementation of the function)
+2. `src/solution.test.js` (contains the implementation of tests)
+3. `package.json` (contains information about the project and dependencies)
+
+You need to build this code and run the tests.
+
+Formulate the solution in the following format:
+
+**package.json**
+```json
+Contents of package.json file
+```
+
+**src/solution.js**
+```javascript
+Contents of src/solution.js file
+```
+
+**src/solution.test.js**
+```javascript
+Contents of src/solution.test.js file
+```
+
+
+**Install**
+```bash
+Commands for install dependencies
+```
+
+**Test**
+```bash
+Commands for running tests
+```
+
+In the end, there will be 5 blocks: package.json, src/solution.js, src/solution.test.js, Install, Test
+
+
+[[[rewrite]]]
+
+**package.json**
+```json
+{{{0}}}
+```
+
+**src/solution.js**
+```javascript
+{{{1}}}
+```
+
+**src/solution.test.js**
+```javascript
+{{{2}}}
+```
+
+```bash
+{{{3}}}
+```
+
+```console
+{{{4}}}
+```
+
+```bash
+{{{5}}}
+```
+
+```console
+{{{6}}}
+```
+
+{{{7}}}
+
+Rewrite JavaScript code that implements this function and name it `solution`. Also, rewrite tests for this function.
+
+Finally, create 3 files:
+
+1. `src/solution.js` (contains the implementation of the function)
+2. `src/solution.test.js` (contains the implementation of tests)
+3. `package.json` (contains information about the project and dependencies)
+
+You need to build this code and run the tests.
+
+Formulate the solution in the following format:
+
+**package.json**
+```json
+Contents of package.json file
+```
+
+**src/solution.js**
+```javascript
+Contents of src/solution.js file
+```
+
+**src/solution.test.js**
+```javascript
+Contents of src/solution.test.js file
+```
+
+
+**Install**
+```bash
+Commands for install dependencies
+```
+
+**Test**
+```bash
+Commands for running tests
+```
+
+In the end, there will be 5 blocks: package.json, src/solution.js, src/solution.test.js, Install, Test

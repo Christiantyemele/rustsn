@@ -1,15 +1,16 @@
-use std::time::Duration;
-use reqwest::blocking::Client;
-use serde::{Deserialize, Serialize};
 use crate::cache::Cache;
 use crate::llm_prompt::Prompt;
-const STOP_WORDS: &[&str] = &[
-    "**Explanation",
-    "**Notes",
-    "### Explanation",
-    "**Additional Notes",
-];
-
+use reqwest::blocking::Client;
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+// const STOP_WORDS: &[&str] = &[
+//     "**Explanation",
+//     "**Notes",
+//     "### Explanation",
+//     "**Additional Notes",
+// ];
+const STOP_WORDS: &[&str] = &[];
+const MAX_TOKENS: i32 = 1000;
 pub struct LLMApi {
     model_type: ModelType,
 }
@@ -17,29 +18,35 @@ pub struct LLMApi {
 #[derive(Debug, PartialEq)]
 pub enum ModelType {
     Ollama,
-    OpenAI {
-        api_key: String
-    },
+    OpenAI { api_key: String },
 }
 
 impl LLMApi {
     pub fn new(model_type: ModelType) -> LLMApi {
-        LLMApi {
-            model_type
-        }
+        LLMApi { model_type }
     }
 
-    pub fn request(&self, prompt_template: &str, params: &Vec<String>, cache: &mut Cache, prompt: &Prompt) -> String {
+    pub fn request(
+        &self,
+        prompt_template: &str,
+        params: &Vec<String>,
+        cache: &mut Cache,
+        prompt: &Prompt,
+    ) -> String {
         match &self.model_type {
             ModelType::Ollama => {
                 let prompt = prompt.create(prompt_template, params);
                 let stop = STOP_WORDS;
                 let request = OllamaRequest {
-                    model: "gemma2:27b".to_string(),
+                    // model: "qwen2.5-coder:7b".to_string(), // smart model but slow
+                    // model: "qwen2.5-coder:1.5b".to_string(), // smart model but slow
+                    model: "gemma2:27b".to_string(), // smart model but slow
+                    // model: "gemma2:2b".to_string(), // fast but very stupid model - excellent for fast testing
+                    //  model: "gemma2".to_string(), // medium model
                     prompt: prompt.to_string(),
                     stream: false,
                     options: OllamaOptions {
-                        num_predict: 500,
+                        num_predict: MAX_TOKENS,
                         stop: stop.iter().map(|s| s.to_string()).collect(),
                     },
                 };
@@ -52,7 +59,7 @@ impl LLMApi {
                 let response = match response_opt {
                     None => {
                         let client = Client::builder()
-                            .timeout(Duration::from_secs(60 * 5))
+                            .timeout(Duration::from_secs(60 * 10))
                             .build()
                             .unwrap();
 
@@ -66,9 +73,7 @@ impl LLMApi {
                         cache.set(request_str.clone(), response.response.clone());
                         response.response
                     }
-                    Some(result) => {
-                        result.to_string()
-                    }
+                    Some(result) => result.to_string(),
                 };
 
                 println!("Response: {}", response);
@@ -76,17 +81,15 @@ impl LLMApi {
             }
             ModelType::OpenAI { api_key } => {
                 let user_prompt = prompt.create(prompt_template, params);
-                let messages = vec![
-                    ChatMessage {
-                        role: "user".to_string(),
-                        content: user_prompt.to_string(),
-                    }
-                ];
+                let messages = vec![ChatMessage {
+                    role: "user".to_string(),
+                    content: user_prompt.to_string(),
+                }];
 
                 let request = OpenAIChatRequest {
                     model: "gpt-4o-2024-08-06".to_string(),
                     messages,
-                    max_tokens: 500,
+                    max_tokens: MAX_TOKENS,
                     temperature: 0.7,
                     stop: Some(STOP_WORDS.iter().map(|s| s.to_string()).collect()),
                 };
@@ -113,26 +116,25 @@ impl LLMApi {
                             .unwrap();
 
                         // Extract the assistant's reply from the first choice
-                        let openai_response = response.choices.into_iter().next()
+                        let openai_response = response
+                            .choices
+                            .into_iter()
+                            .next()
                             .map(|choice| choice.message.content)
                             .unwrap_or_default();
 
                         cache.set(request_str.clone(), openai_response.clone());
                         openai_response
                     }
-                    Some(result) => {
-                        result.to_string()
-                    }
+                    Some(result) => result.to_string(),
                 };
 
                 println!("OpenAI Chat Response: {}", response);
                 response
             }
         }
-
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OllamaRequest {
@@ -147,7 +149,6 @@ struct OllamaOptions {
     num_predict: i32,
     stop: Vec<String>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OllamaResponse {
@@ -165,7 +166,6 @@ struct OllamaResponse {
     eval_duration: i64,
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct OpenAIChatRequest {
     model: String,
@@ -177,7 +177,7 @@ struct OpenAIChatRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ChatMessage {
-    role: String,    // e.g., "user", "assistant", "system"
+    role: String, // e.g., "user", "assistant", "system"
     content: String,
 }
 
